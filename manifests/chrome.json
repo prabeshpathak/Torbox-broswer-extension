@@ -20,13 +20,20 @@
   "permissions": ["storage", "activeTab", "tabs", "contextMenus", "notifications", "alarms"],
   "host_permissions": ["https://api.torbox.app/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["magnet-handler.html"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

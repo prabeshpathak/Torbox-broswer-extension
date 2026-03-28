@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         popup: resolve(__dirname, 'src/popup/popup.html'),
         options: resolve(__dirname, 'src/options/options.html'),
+        'magnet-handler': resolve(__dirname, 'src/magnet-handler/magnet-handler.html'),
         background: resolve(__dirname, 'src/background/background.js'),
         content: resolve(__dirname, 'src/content/content.js'),
       },

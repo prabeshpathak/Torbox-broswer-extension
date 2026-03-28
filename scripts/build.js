@@ -17,7 +17,7 @@ if (existsSync(iconsDir)) {
 }
 
 // Fix HTML paths (Vite nests them under src/popup/, we need them at root)
-const htmlFiles = ['popup', 'options'];
+const htmlFiles = ['popup', 'options', 'magnet-handler'];
 htmlFiles.forEach((name) => {
   const nested = path.join(distDir, 'src', name, `${name}.html`);
   const root = path.join(distDir, `${name}.html`);
