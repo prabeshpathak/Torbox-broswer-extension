@@ -324,7 +324,7 @@ async function addMagnet(magnet) {
   }
 }
 
-const REFERRAL_CODE = '40b86eb0-e7c5-42d1-9c87-ab912dedd5c9';
+const REFERRAL_CODE = 'aa4271de-919a-4259-aab1-ed6436b1b18d';
 
 async function applyReferral() {
   const data = await browser.storage.local.get('apiKey');

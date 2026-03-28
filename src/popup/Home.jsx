@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { messaging } from '../utils/storage';
 import { api } from '../utils/api';
 
-const REFERRAL_CODE = '40b86eb0-e7c5-42d1-9c87-ab912dedd5c9';
+const REFERRAL_CODE = 'aa4271de-919a-4259-aab1-ed6436b1b18d';
 
 function toArray(val) {
   if (Array.isArray(val)) return val;
