@@ -1,6 +1,15 @@
 import browser from 'webextension-polyfill';
 
-const API_BASE = 'https://api.torbox.app/v1/api';
+const DEFAULT_API_VERSION = 'v1';
+
+async function getApiBase() {
+  const data = await browser.storage.local.get('apiVersion');
+  const version = data.apiVersion || DEFAULT_API_VERSION;
+  return `https://api.torbox.app/${version}/api`;
+}
+
+// Legacy constant for synchronous contexts (badge polling, etc.)
+const API_BASE = `https://api.torbox.app/${DEFAULT_API_VERSION}/api`;
 
 // Download queue — processes downloads sequentially to prevent race conditions
 class DownloadQueue {
@@ -186,7 +195,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     const form = new FormData();
     form.append(formField, url);
 
-    const res = await fetch(`${API_BASE}/${endpoint}`, {
+    const apiBase = await getApiBase();
+    const res = await fetch(`${apiBase}/${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
@@ -254,12 +264,13 @@ async function checkSlots() {
   if (!apiKey) return { available: false, reason: 'Not logged in' };
 
   try {
+    const apiBase = await getApiBase();
     const [userRes, torrentsRes] = await Promise.all([
-      fetch(`${API_BASE}/user/me?_t=${Date.now()}`, {
+      fetch(`${apiBase}/user/me?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
         cache: 'no-store',
       }).then((r) => r.json()).catch(() => null),
-      fetch(`${API_BASE}/torrents/mylist?_t=${Date.now()}`, {
+      fetch(`${apiBase}/torrents/mylist?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
         cache: 'no-store',
       }).then((r) => r.json()).catch(() => null),
@@ -294,9 +305,10 @@ async function addMagnet(magnet) {
   if (!apiKey) return { success: false, error: 'Not logged in' };
 
   try {
+    const apiBase = await getApiBase();
     const form = new FormData();
     form.append('magnet', magnet);
-    const res = await fetch(`${API_BASE}/torrents/createtorrent`, {
+    const res = await fetch(`${apiBase}/torrents/createtorrent`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
@@ -320,7 +332,8 @@ async function applyReferral() {
   if (!apiKey) return { success: false, error: 'Not logged in' };
 
   try {
-    const res = await fetch(`${API_BASE}/user/addreferral?referral=${REFERRAL_CODE}`, {
+    const apiBase = await getApiBase();
+    const res = await fetch(`${apiBase}/user/addreferral?referral=${REFERRAL_CODE}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
     });
@@ -354,9 +367,10 @@ async function addLink(url) {
   }
 
   try {
+    const apiBase = await getApiBase();
     const form = new FormData();
     form.append(formField, url);
-    const res = await fetch(`${API_BASE}/${endpoint}`, {
+    const res = await fetch(`${apiBase}/${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,

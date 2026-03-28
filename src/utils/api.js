@@ -1,6 +1,12 @@
 import { storage } from './storage';
 
-const BASE_URL = 'https://api.torbox.app/v1/api';
+const DEFAULT_API_VERSION = 'v1';
+
+async function getApiBase() {
+  const data = await storage.get('apiVersion');
+  const version = data.apiVersion || DEFAULT_API_VERSION;
+  return `https://api.torbox.app/${version}/api`;
+}
 
 async function getApiKey() {
   const data = await storage.get('apiKey');
@@ -11,9 +17,10 @@ async function request(endpoint, options = {}) {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error('No API key set');
 
+  const baseUrl = await getApiBase();
   // Add cache-busting param to prevent stale responses
   const separator = endpoint.includes('?') ? '&' : '?';
-  const url = `${BASE_URL}${endpoint}${separator}_t=${Date.now()}`;
+  const url = `${baseUrl}${endpoint}${separator}_t=${Date.now()}`;
 
   const res = await fetch(url, {
     ...options,
@@ -43,7 +50,8 @@ export const api = {
   },
 
   async validateKey(key) {
-    const res = await fetch(`${BASE_URL}/user/me`, {
+    const baseUrl = await getApiBase();
+    const res = await fetch(`${baseUrl}/user/me`, {
       headers: { Authorization: `Bearer ${key}` },
     });
     const json = await res.json();
