@@ -2,6 +2,41 @@ import browser from 'webextension-polyfill';
 
 const API_BASE = 'https://api.torbox.app/v1/api';
 
+// Download queue — processes downloads sequentially to prevent race conditions
+class DownloadQueue {
+  constructor() {
+    this.queue = [];
+    this.processing = false;
+  }
+
+  enqueue(task) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ task, resolve, reject });
+      this.process();
+    });
+  }
+
+  async process() {
+    if (this.processing) return;
+    this.processing = true;
+    while (this.queue.length > 0) {
+      const { task, resolve, reject } = this.queue.shift();
+      try {
+        resolve(await task());
+      } catch (err) {
+        reject(err);
+      }
+    }
+    this.processing = false;
+  }
+}
+
+const downloadQueue = new DownloadQueue();
+
+// Debounce helper for context menu clicks
+let lastContextClickTime = 0;
+const DEBOUNCE_MS = 300;
+
 // Badge update — polls API and sets active download count on icon
 async function updateBadge() {
   const data = await browser.storage.local.get('apiKey');
@@ -90,9 +125,14 @@ browser.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Handle context menu clicks
+// Handle context menu clicks (debounced + queued)
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== 'download-with-torbox') return;
+
+  // Debounce rapid clicks
+  const now = Date.now();
+  if (now - lastContextClickTime < DEBOUNCE_MS) return;
+  lastContextClickTime = now;
 
   let url = info.linkUrl;
 
@@ -122,7 +162,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  try {
+  // Queue the download to prevent race conditions from rapid clicks
+  downloadQueue.enqueue(async () => {
     let endpoint, formField, successMsg;
     switch (linkType) {
       case 'magnet':
@@ -159,9 +200,9 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     } else {
       notify('TorBox - Error', json.detail || json.error || 'Failed to add download');
     }
-  } catch (err) {
+  }).catch(() => {
     notify('TorBox - Error', 'Network error. Could not reach TorBox API.');
-  }
+  });
 });
 
 function notify(title, message) {
