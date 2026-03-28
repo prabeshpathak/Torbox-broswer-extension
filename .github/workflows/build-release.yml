@@ -1,0 +1,90 @@
+name: Build & Release Extension
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Check commit message for "build"
+        id: check
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if echo "$MSG" | grep -iq "build"; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-release:
+    needs: check-commit
+    if: needs.check-commit.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Generate version tag
+        id: version
+        run: |
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEW_TAG="v1.0.0"
+          else
+            MAJOR=$(echo "$LATEST_TAG" | cut -d. -f1 | tr -d v)
+            MINOR=$(echo "$LATEST_TAG" | cut -d. -f2)
+            PATCH=$(echo "$LATEST_TAG" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "Version: $NEW_TAG"
+
+      - name: Package Chrome extension
+        run: |
+          mkdir -p releases
+          cd dist/chrome && zip -r ../../releases/torbox-chrome-${{ steps.version.outputs.tag }}.zip .
+
+      - name: Package Firefox extension
+        run: |
+          mkdir -p releases
+          cd dist/firefox && zip -r ../../releases/torbox-firefox-${{ steps.version.outputs.tag }}.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body: |
+            **Commit:** ${{ github.event.head_commit.message }}
+
+            ### Downloads
+            - `torbox-chrome-${{ steps.version.outputs.tag }}.zip` — Chrome/Edge/Brave
+            - `torbox-firefox-${{ steps.version.outputs.tag }}.zip` — Firefox
+          files: |
+            releases/torbox-chrome-${{ steps.version.outputs.tag }}.zip
+            releases/torbox-firefox-${{ steps.version.outputs.tag }}.zip
