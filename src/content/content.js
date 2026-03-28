@@ -115,6 +115,65 @@ function scanForMagnetLinks() {
 
 checkSlotStatus();
 
+// Intercept magnet link clicks — send to TorBox instead of opening torrent client
+document.addEventListener('click', (e) => {
+  const anchor = e.target.closest('a[href^="magnet:"]');
+  if (!anchor) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  // Show a small toast notification on the page
+  showToast('Sending to TorBox...');
+
+  B.runtime.sendMessage({
+    type: 'ADD_MAGNET',
+    magnet: anchor.href,
+  }).then((response) => {
+    if (response?.success) {
+      showToast('Added to TorBox!', 'success');
+    } else {
+      showToast(response?.error || 'Failed to add', 'error');
+    }
+  }).catch(() => {
+    showToast('Error connecting to TorBox', 'error');
+  });
+}, true);
+
+function showToast(message, type = 'info') {
+  // Remove existing toast
+  const existing = document.getElementById('torbox-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'torbox-toast';
+  const bg = type === 'success' ? '#04BF8A' : type === 'error' ? '#ef4444' : '#1A1D26';
+  const color = type === 'info' ? '#e0e0e0' : '#fff';
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    background: ${bg};
+    color: ${color};
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    z-index: 2147483647;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: opacity 0.3s;
+    opacity: 1;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
 const observer = new MutationObserver(() => scanForMagnetLinks());
 observer.observe(document.body, { childList: true, subtree: true });
 
