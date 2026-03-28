@@ -53,11 +53,20 @@ function setBadge(text) {
   if (action?.setBadgeBackgroundColor) action.setBadgeBackgroundColor({ color: '#04BF8A' });
 }
 
+// Classify a link URL into a download type
+function classifyLink(url) {
+  if (!url) return null;
+  if (url.startsWith('magnet:')) return 'magnet';
+  if (/\.nzb(\.gz)?$/i.test(url)) return 'nzb';
+  if (url.startsWith('http://') || url.startsWith('https://')) return 'web';
+  return null;
+}
+
 // Create context menu + start badge polling on install
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
-    id: 'add-magnet-to-torbox',
-    title: 'Add to TorBox',
+    id: 'download-with-torbox',
+    title: 'Download with TorBox',
     contexts: ['link'],
   });
 
@@ -83,23 +92,25 @@ browser.alarms.onAlarm.addListener((alarm) => {
 
 // Handle context menu clicks
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== 'add-magnet-to-torbox') return;
+  if (info.menuItemId !== 'download-with-torbox') return;
 
-  let magnet = info.linkUrl;
+  let url = info.linkUrl;
 
-  if (!magnet || !magnet.startsWith('magnet:')) {
+  // Try to get magnet from content script if link isn't directly usable
+  if (!url || !classifyLink(url)) {
     try {
       const response = await browser.tabs.sendMessage(tab.id, {
         type: 'GET_MAGNET_LINK',
       });
-      magnet = response?.magnet;
+      if (response?.magnet) url = response.magnet;
     } catch (err) {
       // Content script might not be loaded
     }
   }
 
-  if (!magnet || !magnet.startsWith('magnet:')) {
-    notify('TorBox', 'Not a magnet link.');
+  const linkType = classifyLink(url);
+  if (!linkType) {
+    notify('TorBox', 'Invalid link type. Supported: magnet, NZB, and web (HTTP/HTTPS) links.');
     return;
   }
 
@@ -112,10 +123,29 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   try {
-    const form = new FormData();
-    form.append('magnet', magnet);
+    let endpoint, formField, successMsg;
+    switch (linkType) {
+      case 'magnet':
+        endpoint = 'torrents/createtorrent';
+        formField = 'magnet';
+        successMsg = 'Torrent added successfully';
+        break;
+      case 'nzb':
+        endpoint = 'usenet/createusenetdownload';
+        formField = 'link';
+        successMsg = 'NZB download added successfully';
+        break;
+      case 'web':
+        endpoint = 'webdl/createwebdownload';
+        formField = 'link';
+        successMsg = 'Web download added successfully';
+        break;
+    }
 
-    const res = await fetch(`${API_BASE}/torrents/createtorrent`, {
+    const form = new FormData();
+    form.append(formField, url);
+
+    const res = await fetch(`${API_BASE}/${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
@@ -124,10 +154,10 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     const json = await res.json();
 
     if (json.success) {
-      notify('TorBox', json.detail || 'Torrent added successfully');
+      notify('TorBox', json.detail || successMsg);
       updateBadge();
     } else {
-      notify('TorBox - Error', json.detail || json.error || 'Failed to add torrent');
+      notify('TorBox - Error', json.detail || json.error || 'Failed to add download');
     }
   } catch (err) {
     notify('TorBox - Error', 'Network error. Could not reach TorBox API.');
@@ -157,6 +187,8 @@ browser.runtime.onMessage.addListener((message) => {
       return checkSlots();
     case 'ADD_MAGNET':
       return addMagnet(message.magnet);
+    case 'ADD_LINK':
+      return addLink(message.url);
     case 'GET_PAGE_DATA':
       return Promise.resolve({ status: 'ok' });
   }
@@ -214,6 +246,47 @@ async function addMagnet(magnet) {
     const form = new FormData();
     form.append('magnet', magnet);
     const res = await fetch(`${API_BASE}/torrents/createtorrent`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+    const json = await res.json();
+    if (json.success) {
+      updateBadge();
+      return { success: true };
+    }
+    return { success: false, error: json.detail || 'Failed' };
+  } catch {
+    return { success: false, error: 'Network error' };
+  }
+}
+
+async function addLink(url) {
+  const data = await browser.storage.local.get('apiKey');
+  const apiKey = data.apiKey;
+  if (!apiKey) return { success: false, error: 'Not logged in' };
+
+  const linkType = classifyLink(url);
+  if (!linkType) return { success: false, error: 'Invalid link type' };
+
+  let endpoint, formField;
+  switch (linkType) {
+    case 'magnet':
+      return addMagnet(url);
+    case 'nzb':
+      endpoint = 'usenet/createusenetdownload';
+      formField = 'link';
+      break;
+    case 'web':
+      endpoint = 'webdl/createwebdownload';
+      formField = 'link';
+      break;
+  }
+
+  try {
+    const form = new FormData();
+    form.append(formField, url);
+    const res = await fetch(`${API_BASE}/${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
