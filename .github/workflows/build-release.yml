@@ -51,16 +51,19 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
-          if [ -z "$LATEST_TAG" ]; then
-            NEW_TAG="v1.0.0"
+          # Read base version from package.json (e.g. "alpha.0", "beta.0", "1.0.0")
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          # Extract prefix (everything before the last number) and the last number
+          PREFIX=$(echo "$BASE_VERSION" | sed 's/\.[0-9]*$//' )
+          # Find the highest existing tag with this prefix
+          LATEST=$(git tag --sort=-v:refname | grep -E "^${PREFIX}\.[0-9]+$" | head -n1)
+          if [ -z "$LATEST" ]; then
+            NEXT_NUM=1
           else
-            MAJOR=$(echo "$LATEST_TAG" | cut -d. -f1 | tr -d v)
-            MINOR=$(echo "$LATEST_TAG" | cut -d. -f2)
-            PATCH=$(echo "$LATEST_TAG" | cut -d. -f3)
-            PATCH=$((PATCH + 1))
-            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+            LAST_NUM=$(echo "$LATEST" | grep -oE '[0-9]+$')
+            NEXT_NUM=$((LAST_NUM + 1))
           fi
+          NEW_TAG="${PREFIX}.${NEXT_NUM}"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
           echo "Version: $NEW_TAG"
 
@@ -78,7 +81,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
+          name: TorBox Extension ${{ steps.version.outputs.tag }}
           body: |
             **Commit:** ${{ github.event.head_commit.message }}
 

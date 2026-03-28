@@ -1,6 +1,6 @@
 {
   "name": "torboxextension",
-  "version": "1.0.0",
+  "version": "alpha.0",
   "description": "Simple extension for using torbox",
   "main": "index.js",
    "scripts": {
