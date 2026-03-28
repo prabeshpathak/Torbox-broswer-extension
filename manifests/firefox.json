@@ -41,14 +41,6 @@
       "run_at": "document_idle"
     }
   ],
-  "web_accessible_resources": ["magnet-handler.html"],
-  "protocol_handlers": [
-    {
-      "protocol": "magnet",
-      "name": "TorBox",
-      "uriTemplate": "magnet-handler.html?uri=%s"
-    }
-  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "torbox-extension@torbox.app",

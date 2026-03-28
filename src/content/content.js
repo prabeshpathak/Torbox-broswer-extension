@@ -115,63 +115,6 @@ function scanForMagnetLinks() {
 
 checkSlotStatus();
 
-// Inject a page-world script to detect JS-triggered magnet links
-// (e.g. window.location = 'magnet:...' or location.href = 'magnet:...')
-const injectedScript = document.createElement('script');
-injectedScript.textContent = `(function() {
-  // Intercept window.location.href setter
-  const origDescriptor = Object.getOwnPropertyDescriptor(Location.prototype, 'href');
-  if (origDescriptor && origDescriptor.set) {
-    Object.defineProperty(Location.prototype, 'href', {
-      get: origDescriptor.get,
-      set: function(val) {
-        if (typeof val === 'string' && val.startsWith('magnet:')) {
-          window.dispatchEvent(new CustomEvent('__torbox_magnet', { detail: val }));
-        }
-        return origDescriptor.set.call(this, val);
-      },
-      configurable: true,
-      enumerable: true,
-    });
-  }
-
-  // Intercept window.location assign
-  const origAssign = Location.prototype.assign;
-  Location.prototype.assign = function(url) {
-    if (typeof url === 'string' && url.startsWith('magnet:')) {
-      window.dispatchEvent(new CustomEvent('__torbox_magnet', { detail: url }));
-    }
-    return origAssign.call(this, url);
-  };
-
-  // Intercept window.open for magnet links
-  const origOpen = window.open;
-  window.open = function(url) {
-    if (typeof url === 'string' && url.startsWith('magnet:')) {
-      window.dispatchEvent(new CustomEvent('__torbox_magnet', { detail: url }));
-    }
-    return origOpen.apply(this, arguments);
-  };
-
-  // Catch click events on elements that trigger magnet links via JS
-  document.addEventListener('click', function(e) {
-    const anchor = e.target.closest('a[href^="magnet:"]');
-    if (anchor) {
-      window.dispatchEvent(new CustomEvent('__torbox_magnet', { detail: anchor.href }));
-    }
-  }, true);
-})();`;
-(document.head || document.documentElement).appendChild(injectedScript);
-injectedScript.remove();
-
-// Listen for magnet links detected by the injected page-world script
-window.addEventListener('__torbox_magnet', (e) => {
-  const magnet = e.detail;
-  if (!magnet || !magnet.startsWith('magnet:')) return;
-
-  // Send to TorBox in the background (don't block — let native handler proceed too)
-  B.runtime.sendMessage({ type: 'ADD_MAGNET', magnet }).catch(() => {});
-});
 
 const observer = new MutationObserver(() => scanForMagnetLinks());
 observer.observe(document.body, { childList: true, subtree: true });
