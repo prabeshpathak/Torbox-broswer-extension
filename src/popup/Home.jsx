@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { messaging } from '../utils/storage';
 import { api } from '../utils/api';
+
+const REFERRAL_CODE = '40b86eb0-e7c5-42d1-9c87-ab912dedd5c9';
 
 function toArray(val) {
   if (Array.isArray(val)) return val;
@@ -209,6 +211,16 @@ export default function Home({ user, onLogout }) {
   const [magnet, setMagnet] = useState('');
   const [adding, setAdding] = useState(false);
   const [addMsg, setAddMsg] = useState('');
+  const [referralCopied, setReferralCopied] = useState(false);
+
+  const handleReferral = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(REFERRAL_CODE);
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+      window.open(`https://torbox.app/subscription?referral=${REFERRAL_CODE}`, '_blank');
+    } catch { /* ignore */ }
+  }, []);
 
   async function fetchDownloads() {
     const key = await api.getApiKey();
@@ -370,6 +382,9 @@ export default function Home({ user, onLogout }) {
             <h1>TorBox</h1>
           </div>
           <div className="header-actions">
+            <button className="icon-btn referral-btn" onClick={handleReferral} title={referralCopied ? 'Copied!' : 'Support TorBox (referral)'}>
+              {referralCopied ? '\u2705' : '\u2764'}
+            </button>
             <button className="icon-btn add-btn" onClick={() => setShowAdd(!showAdd)} title="Add Torrent">
               &#43;
             </button>

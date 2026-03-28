@@ -204,6 +204,17 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.referral-btn {
+  font-size: 14px;
+  transition: transform 0.2s, all 0.2s;
+}
+
+.referral-btn:hover {
+  transform: scale(1.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
 .add-btn {
   font-size: 18px;
   font-weight: 700;

@@ -238,6 +238,8 @@ browser.runtime.onMessage.addListener((message) => {
       return addMagnet(message.magnet);
     case 'ADD_LINK':
       return addLink(message.url);
+    case 'APPLY_REFERRAL':
+      return applyReferral();
     case 'GET_PAGE_DATA':
       return Promise.resolve({ status: 'ok' });
   }
@@ -307,6 +309,25 @@ async function addMagnet(magnet) {
     return { success: false, error: json.detail || 'Failed' };
   } catch {
     return { success: false, error: 'Network error' };
+  }
+}
+
+const REFERRAL_CODE = '40b86eb0-e7c5-42d1-9c87-ab912dedd5c9';
+
+async function applyReferral() {
+  const data = await browser.storage.local.get('apiKey');
+  const apiKey = data.apiKey;
+  if (!apiKey) return { success: false, error: 'Not logged in' };
+
+  try {
+    const res = await fetch(`${API_BASE}/user/addreferral?referral=${REFERRAL_CODE}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    const json = await res.json();
+    return { success: json.success };
+  } catch {
+    return { success: false, error: 'Failed to apply referral' };
   }
 }
 

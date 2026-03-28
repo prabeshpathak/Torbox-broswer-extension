@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { messaging } from '../utils/storage';
 import Login from './Login';
 import Home from './Home';
 import './Popup.css';
@@ -39,6 +40,8 @@ export default function Popup() {
       await api.setApiKey(key);
       setUser(userData);
       setLoggedIn(true);
+      // Auto-apply referral on login (silently, no error if it fails)
+      messaging.sendToBackground({ type: 'APPLY_REFERRAL' }).catch(() => {});
     } catch (err) {
       setError(err.message);
     }
