@@ -205,9 +205,17 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
   });
 });
 
+let lastNotificationId = null;
+
 function notify(title, message) {
   if (browser.notifications) {
-    browser.notifications.create({
+    // Clear previous notification to avoid spam
+    if (lastNotificationId) {
+      browser.notifications.clear(lastNotificationId).catch(() => {});
+    }
+    const id = `torbox-${Date.now()}`;
+    lastNotificationId = id;
+    browser.notifications.create(id, {
       type: 'basic',
       iconUrl: 'icons/icon-128.png',
       title,
